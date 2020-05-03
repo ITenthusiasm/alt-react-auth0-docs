@@ -1,38 +1,34 @@
 // src/react-auth0-spa.js
 import React, { useState, useEffect, useContext } from "react";
 import createAuth0Client from "@auth0/auth0-spa-js";
-
-const DEFAULT_REDIRECT_CALLBACK = () =>
-  window.history.replaceState({}, document.title, window.location.pathname);
+import history from "./utils/history";
 
 export const Auth0Context = React.createContext();
+
 export const useAuth0 = () => useContext(Auth0Context);
-export const Auth0Provider = ({
-  children,
-  onRedirectCallback = DEFAULT_REDIRECT_CALLBACK,
-  ...initOptions
-}) => {
+
+export const Auth0Provider = ({ children, config }) => {
+  // Auth0 State
+  const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState();
   const [user, setUser] = useState();
+
+  // Auth0 Client
   const [auth0Client, setAuth0] = useState();
-  const [loading, setLoading] = useState(true);
-  const [popupOpen, setPopupOpen] = useState(false);
 
   useEffect(() => {
-    const initAuth0 = async () => {
-      const auth0FromHook = await createAuth0Client(initOptions);
+    (async function initAuth0() {
+      const auth0FromHook = await createAuth0Client({ ...config });
       setAuth0(auth0FromHook);
 
-      if (
-        window.location.search.includes("code=") &&
-        window.location.search.includes("state=")
-      ) {
+      const { search } = window.location;
+      if (search.includes("code=") && search.includes("state=")) {
         const { appState } = await auth0FromHook.handleRedirectCallback();
-        onRedirectCallback(appState);
+        const targetUrl = appState?.targetUrl;
+        history.push(targetUrl || "/");
       }
 
       const isAuthenticated = await auth0FromHook.isAuthenticated();
-
       setIsAuthenticated(isAuthenticated);
 
       if (isAuthenticated) {
@@ -41,47 +37,14 @@ export const Auth0Provider = ({
       }
 
       setLoading(false);
-    };
-    initAuth0();
-    // eslint-disable-next-line
-  }, []);
+    })();
+  }, [config]);
 
-  const loginWithPopup = async (params = {}) => {
-    setPopupOpen(true);
-    try {
-      await auth0Client.loginWithPopup(params);
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setPopupOpen(false);
-    }
-    const user = await auth0Client.getUser();
-    setUser(user);
-    setIsAuthenticated(true);
-  };
-
-  const handleRedirectCallback = async () => {
-    setLoading(true);
-    await auth0Client.handleRedirectCallback();
-    const user = await auth0Client.getUser();
-    setLoading(false);
-    setIsAuthenticated(true);
-    setUser(user);
-  };
   return (
     <Auth0Context.Provider
       value={{
-        isAuthenticated,
-        user,
-        loading,
-        popupOpen,
-        loginWithPopup,
-        handleRedirectCallback,
-        getIdTokenClaims: (...p) => auth0Client.getIdTokenClaims(...p),
-        loginWithRedirect: (...p) => auth0Client.loginWithRedirect(...p),
-        getTokenSilently: (...p) => auth0Client.getTokenSilently(...p),
-        getTokenWithPopup: (...p) => auth0Client.getTokenWithPopup(...p),
-        logout: (...p) => auth0Client.logout(...p),
+        auth0State: { loading, isAuthenticated, user },
+        auth0Client,
       }}
     >
       {children}

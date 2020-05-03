@@ -5,23 +5,24 @@ import { Link } from "react-router-dom";
 import { useAuth0 } from "../react-auth0-spa";
 
 const NavBar = () => {
-  const { isAuthenticated, loginWithRedirect, logout } = useAuth0();
+  const { auth0State, auth0Client } = useAuth0();
+
+  if (!auth0State.isAuthenticated) {
+    return (
+      <nav>
+        <button onClick={() => auth0Client.loginWithRedirect()}>Log in</button>
+      </nav>
+    );
+  }
 
   return (
-    <div>
-      {!isAuthenticated && (
-        <button onClick={() => loginWithRedirect({})}>Log in</button>
-      )}
-
-      {isAuthenticated && <button onClick={() => logout()}>Log out</button>}
-
-      {isAuthenticated && (
-        <span>
-          <Link to="/">Home</Link>&nbsp;
-          <Link to="/profile">Profile</Link>
-        </span>
-      )}
-    </div>
+    <nav>
+      <button onClick={() => auth0Client.logout()}>Log out</button>
+      <span>
+        <Link to="/">Home</Link>&nbsp;
+        <Link to="/profile">Profile</Link>
+      </span>
+    </nav>
   );
 };
 
